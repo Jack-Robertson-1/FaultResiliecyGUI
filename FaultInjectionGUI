@@ -11,6 +11,16 @@ from models import models
 from decode import load_image_tensor, decode_output
 import colorsys
 
+IMAGE_PATH = r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\108_10400100457A8A00_tile_68.png"
+
+# Colors for faulty vs non-faulty boxes (BGR, since cv2 draws in BGR)
+COLOR_NONFAULTY = (0, 255, 0)   # green
+COLOR_FAULTY = (0, 0, 255)      # red
+
+# Label text styling
+LABEL_FONT = cv2.FONT_HERSHEY_DUPLEX   # cleaner, less blocky than SIMPLEX
+LABEL_SCALE = 0.4                       # smaller than the previous 0.6
+
 ############### MAIN WINDOW ###############
 
 class MainWindow(QMainWindow):
@@ -18,15 +28,24 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Fault Tolerance Display")
         self.resize(1200, 700)
-        
+
         # Main widget to build on top off
         central_widget = QWidget()
+        central_widget.setStyleSheet("""
+            QWidget {
+                background: qradialgradient(
+                    cx: 0.5, cy: 0.5, radius: 0.7, fx: 0.5, fy: 0.5,
+                    stop: 0 #1E222B,
+                    stop: 1 #171A21
+                );
+            }
+        """) #cx, cy (center of gradient), radius, fx, fy (brightest and lightest spots sit)
         self.setCentralWidget(central_widget)
 
         # Arranges everything into a row/column grid
         main_layout = QGridLayout()
         central_widget.setLayout(main_layout)
-        
+
         # For Grid lines
         main_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -34,24 +53,31 @@ class MainWindow(QMainWindow):
         top_bar = QLabel("TOP BAR")
         bottom_menu = QLabel("BOTTOM MENU")
         sidebar = QLabel("SIDEBAR")
-                
+        sidebar.setStyleSheet("""
+            QLabel {
+                background: qradialgradient(
+                    cx: 0.5, cy: 0.5, radius: 1.0, fx: 0.5, fy: 0.5,
+                    stop: 0 #1D1E27,
+                    stop: 1 #121319
+                );
+                border: 1px solid red;
+            }
+        """)
+
         # Show Image
         self.live_video = QLabel()
         self.live_video.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-        pixmap = QPixmap(r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\108_10400100457A8A00_tile_68.png")
-        self.live_video.setPixmap(pixmap)
         self.live_video.setScaledContents(False)
-        self.live_video.setAlignment(Qt.AlignmentFlag.AlignCenter) # Make it fit
-        
-        
-        for label in [top_bar, self.live_video, bottom_menu, sidebar]:   # Borders
-            label.setStyleSheet("border: 1px solid red;")
+        self.live_video.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        for label in [top_bar, bottom_menu]:
+            label.setStyleSheet("background: transparent; border: 1px solid red;") # Make transparent
 
         main_layout.addWidget(top_bar, 0, 1)
         main_layout.addWidget(self.live_video, 2, 1)
         main_layout.addWidget(bottom_menu, 4, 1)
         main_layout.addWidget(sidebar, 0, 3, 5, 1)  # spans all 5 rows
-        
+
         main_layout.setColumnStretch(0, 1)   # left blank margin
         main_layout.setColumnStretch(1, 18)  # center content column - gets most space
         main_layout.setColumnStretch(2, 1)   # right blank margin
@@ -62,33 +88,74 @@ class MainWindow(QMainWindow):
         main_layout.setRowStretch(2, 30)  # video - gets most vertical space
         main_layout.setRowStretch(3, 1)   # blank gap
         main_layout.setRowStretch(4, 16)  # bottom menu
-        
+
+        # --- Cache: run inference ONCE, store the boxed base pixmap ---
+        # Everything downstream (resize) just rescales this cached pixmap,
+        # it never re-runs the model.
+        self.base_pixmap = None
+        self.refresh_detections()
+
+    ##### RUN INFERENCE AND CACHE THE RESULT #####
+
+    def refresh_detections(self, faulty_detections=None):
+        """
+        Runs inference once (or accepts pre-computed faulty detections to
+        compare against), draws both sets of boxes onto the image, and
+        caches the result as self.base_pixmap. Call this again only when
+        you actually want to re-run inference (new image, new fault
+        injected, etc.) - NOT on every resize.
+        """
+        nonfaulty_detections, img_array = get_real_detection(IMAGE_PATH)
+
+        self.base_pixmap = load_image_with_boxes(
+            img_array,
+            nonfaulty_detections,
+            faulty_detections
+        )
+
+        self._rescale_to_label()
+
     ##### FOR WHEN WINDOW IS RESIZED #####
-        
+
     def resizeEvent(self, event):
-        path = r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\108_10400100457A8A00_tile_68.png"
-        detections, img_array = get_real_detection(path)
-        pixmap = load_image_with_box(img_array, detections)
+        # Only rescales the already-cached pixmap - no inference here
+        self._rescale_to_label()
+        super().resizeEvent(event)
+
+    def _rescale_to_label(self):
+        if self.base_pixmap is None:
+            return
 
         target_size = self.live_video.size()
-        scaled = pixmap.scaled(
+        scaled = self.base_pixmap.scaled(
             target_size.width(),
             target_size.height(),
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         )
         self.live_video.setPixmap(scaled)
-        super().resizeEvent(event)
-        
-############### LOAD IMAGE WITH BOX ###############
 
-def load_image_with_box(img_array, detections):
+############### LOAD IMAGE WITH BOXES (faulty + non-faulty) ###############
+
+def load_image_with_boxes(img_array, nonfaulty_detections, faulty_detections=None):
+    """
+    Draws non-faulty detections in green and faulty detections (if given)
+    in red, on the same image, so they can be visually compared directly.
+    """
     img = img_array.copy()
-    for (x1, y1, x2, y2), cls, conf in detections:
-        color = get_class_color(cls)
-        cv2.rectangle(img, (x1, y1), (x2, y2), color, 1)
-        text = f"{cls}   {conf:.2f}"
-        cv2.putText(img, text, (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
+
+    # Non-faulty (baseline / majority-voted) detections
+    for (x1, y1, x2, y2), cls, conf in nonfaulty_detections:
+        cv2.rectangle(img, (x1, y1), (x2, y2), COLOR_NONFAULTY, 1)
+        text = f"{cls}  {conf:.2f}"
+        cv2.putText(img, text, (x1, y2 + 14), LABEL_FONT, LABEL_SCALE, COLOR_NONFAULTY, 1, cv2.LINE_AA)
+
+    # Faulty detections, drawn on top in a different color
+    if faulty_detections:
+        for (x1, y1, x2, y2), cls, conf in faulty_detections:
+            cv2.rectangle(img, (x1, y1), (x2, y2), COLOR_FAULTY, 1)
+            text = f"{cls}  {conf:.2f}"
+            cv2.putText(img, text, (x1, y1 - 5), LABEL_FONT, LABEL_SCALE, COLOR_FAULTY, 1, cv2.LINE_AA)
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     h, w, ch = img_rgb.shape
@@ -97,13 +164,13 @@ def load_image_with_box(img_array, detections):
 
 ############### GET THE DETECTION ###############
 
-def get_real_detection(path):
+def get_real_detection(path, model_index=0):
     img_tensor = load_image_tensor(path)
 
     with torch.no_grad():
-        raw = models[0](img_tensor)
+        raw = models[model_index](img_tensor)
 
-    detect_layer = models[0].model[-1]
+    detect_layer = models[model_index].model[-1]
     preds = raw[0] if isinstance(raw, tuple) else raw
     preds = preds.transpose(1, 2)
     out = detect_layer.postprocess(preds)[0]
@@ -133,6 +200,7 @@ def get_class_color(cls):
     hue = (cls * golden_ratio) % 1.0
     r, g, b = colorsys.hsv_to_rgb(hue, 0.85, 1.0)
     return (int(b * 255), int(g * 255), int(r * 255))
+
 ############### MAIN CODE ###############
 
 app = QApplication(sys.argv)    # Engine to power GUI
