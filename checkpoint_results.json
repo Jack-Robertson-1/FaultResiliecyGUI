@@ -1,0 +1,116 @@
+{
+  "single": {
+    "1_of_3": {
+      "sdc_pct_s": 0,
+      "sdc_pct_p": 0,
+      "avg_p": 0,
+      "avg_s": 0,
+      "dwc_sdc_pct_s": 0,
+      "dwc_sdc_pct_p": 0,
+      "avg_dwc_s": 0,
+      "avg_dwc_p": 0,
+      "avg_runs_s": 0,
+      "avg_runs_p": 0
+    },
+    "2_of_3": {
+      "sdc_pct_s": 0,
+      "sdc_pct_p": 0,
+      "avg_p": 0,
+      "avg_s": 0,
+      "dwc_sdc_pct_s": 0,
+      "dwc_sdc_pct_p": 0,
+      "avg_dwc_s": 0,
+      "avg_dwc_p": 0,
+      "avg_runs_s": 0,
+      "avg_runs_p": 0
+    },
+    "3_of_3": {
+      "sdc_pct_s": 0,
+      "sdc_pct_p": 0,
+      "avg_p": 0,
+      "avg_s": 0,
+      "dwc_sdc_pct_s": 0,
+      "dwc_sdc_pct_p": 0,
+      "avg_dwc_s": 0,
+      "avg_dwc_p": 0,
+      "avg_runs_s": 0,
+      "avg_runs_p": 0
+    }
+  },
+  "multi": {
+    "1_of_3": {
+      "sdc_pct_s": 0,
+      "sdc_pct_p": 0,
+      "avg_p": 0,
+      "avg_s": 0,
+      "dwc_sdc_pct_s": 0,
+      "dwc_sdc_pct_p": 0,
+      "avg_dwc_s": 0,
+      "avg_dwc_p": 0,
+      "avg_runs_s": 0,
+      "avg_runs_p": 0
+    },
+    "2_of_3": {
+      "sdc_pct_s": 0,
+      "sdc_pct_p": 0,
+      "avg_p": 0,
+      "avg_s": 0,
+      "dwc_sdc_pct_s": 0,
+      "dwc_sdc_pct_p": 0,
+      "avg_dwc_s": 0,
+      "avg_dwc_p": 0,
+      "avg_runs_s": 0,
+      "avg_runs_p": 0
+    },
+    "3_of_3": {
+      "sdc_pct_s": 0,
+      "sdc_pct_p": 0,
+      "avg_p": 0,
+      "avg_s": 0,
+      "dwc_sdc_pct_s": 0,
+      "dwc_sdc_pct_p": 0,
+      "avg_dwc_s": 0,
+      "avg_dwc_p": 0,
+      "avg_runs_s": 0,
+      "avg_runs_p": 0
+    }
+  },
+  "stuck": {
+    "1_of_3": {
+      "sdc_pct_s": 0,
+      "sdc_pct_p": 0,
+      "avg_p": 0,
+      "avg_s": 0,
+      "dwc_sdc_pct_s": 0,
+      "dwc_sdc_pct_p": 0,
+      "avg_dwc_s": 0,
+      "avg_dwc_p": 0,
+      "avg_runs_s": 0,
+      "avg_runs_p": 0
+    },
+    "2_of_3": {
+      "sdc_pct_s": 0,
+      "sdc_pct_p": 0,
+      "avg_p": 0,
+      "avg_s": 0,
+      "dwc_sdc_pct_s": 0,
+      "dwc_sdc_pct_p": 0,
+      "avg_dwc_s": 0,
+      "avg_dwc_p": 0,
+      "avg_runs_s": 0,
+      "avg_runs_p": 0
+    },
+    "3_of_3": {
+      "sdc_pct_s": 0,
+      "sdc_pct_p": 0,
+      "avg_p": 0,
+      "avg_s": 0,
+      "dwc_sdc_pct_s": 0,
+      "dwc_sdc_pct_p": 0,
+      "avg_dwc_s": 0,
+      "avg_dwc_p": 0,
+      "avg_runs_s": 0,
+      "avg_runs_p": 0
+    }
+  }
+}

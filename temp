@@ -1,0 +1,30 @@
+import os
+from ultralytics import YOLO
+
+test_dir = r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled"
+wrapper = YOLO("best.pt")
+
+files = [f for f in os.listdir(test_dir) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
+print(f"Found {len(files)} images total\n")
+
+results = []
+skipped = 0
+for f in files:
+    path = os.path.join(test_dir, f)
+    try:
+        out = wrapper.predict(path, conf=0.25, verbose=False)
+        if len(out) == 0:
+            skipped += 1
+            continue
+        count = len(out[0].boxes)
+        results.append((f, count))
+    except Exception as e:
+        skipped += 1
+        continue
+
+print(f"Skipped {skipped} unreadable images\n")
+
+results.sort(key=lambda x: x[1])
+print("Sorted by detection count (low to high):")
+for f, count in results:
+    print(f"  {count:>3}  {f}")

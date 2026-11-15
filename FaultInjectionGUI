@@ -1,0 +1,13 @@
+import sys
+from PyQt6.QtWidgets import Qapplication, QMainWindow
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Fault Tolerance Display")
+        self.resize(1200, 700)
+        
+app = QApplication(sys.argv)    # Engine to power GUI
+window = MainWindow()           # Create instance of class window
+window.show()                   # Show da window
+app.exec()                      # Start the loop
