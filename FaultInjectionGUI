@@ -1,11 +1,60 @@
 import sys
-from PyQt6.QtWidgets import Qapplication, QMainWindow
+from PyQt6.QtWidgets import QApplication, QMainWindow
+from PyQt6.QtWidgets import QWidget, QGridLayout, QLabel
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QSizePolicy
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Fault Tolerance Display")
         self.resize(1200, 700)
+        
+        # Main widget to build on top off
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+
+        # Arranges everything into a row/column grid
+        main_layout = QGridLayout()
+        central_widget.setLayout(main_layout)
+        
+        # For Grid lines
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Use text as placeholder
+        top_bar = QLabel("TOP BAR")
+        bottom_menu = QLabel("BOTTOM MENU")
+        sidebar = QLabel("SIDEBAR")
+                
+        # Show Image
+        live_video = QLabel()
+        pixmap = QPixmap(r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\10_104001002E88FE00_tile_10.png")
+        live_video.setPixmap(pixmap)
+        live_video.setScaledContents(False)
+        live_video.setAlignment(Qt.AlignmentFlag.AlignCenter) # Make it fit
+        
+        
+        for label in [top_bar, live_video, bottom_menu, sidebar]:   # Borders
+            label.setStyleSheet("border: 1px solid red;")
+
+        main_layout.addWidget(top_bar, 0, 1)
+        main_layout.addWidget(live_video, 2, 1)
+        main_layout.addWidget(bottom_menu, 4, 1)
+        main_layout.addWidget(sidebar, 0, 3, 5, 1)  # spans all 5 rows
+        
+        main_layout.setColumnStretch(0, 1)   # left blank margin
+        main_layout.setColumnStretch(1, 18)  # center content column - gets most space
+        main_layout.setColumnStretch(2, 1)   # right blank margin
+        main_layout.setColumnStretch(3, 9)   # sidebar
+
+        main_layout.setRowStretch(0, 8)   # top bar
+        main_layout.setRowStretch(1, 1)   # blank gap
+        main_layout.setRowStretch(2, 30)  # video - gets most vertical space
+        main_layout.setRowStretch(3, 1)   # blank gap
+        main_layout.setRowStretch(4, 16)  # bottom menu
+        
+        
         
 app = QApplication(sys.argv)    # Engine to power GUI
 window = MainWindow()           # Create instance of class window
