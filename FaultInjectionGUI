@@ -4,6 +4,13 @@ from PyQt6.QtWidgets import QWidget, QGridLayout, QLabel
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSizePolicy
+import cv2
+from PyQt6.QtGui import QImage
+import torch
+from models import models
+from decode import load_image_tensor, decode_output
+
+############### MAIN WINDOW ###############
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -28,18 +35,19 @@ class MainWindow(QMainWindow):
         sidebar = QLabel("SIDEBAR")
                 
         # Show Image
-        live_video = QLabel()
+        self.live_video = QLabel()
+        self.live_video.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         pixmap = QPixmap(r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\10_104001002E88FE00_tile_10.png")
-        live_video.setPixmap(pixmap)
-        live_video.setScaledContents(False)
-        live_video.setAlignment(Qt.AlignmentFlag.AlignCenter) # Make it fit
+        self.live_video.setPixmap(pixmap)
+        self.live_video.setScaledContents(False)
+        self.live_video.setAlignment(Qt.AlignmentFlag.AlignCenter) # Make it fit
         
         
-        for label in [top_bar, live_video, bottom_menu, sidebar]:   # Borders
+        for label in [top_bar, self.live_video, bottom_menu, sidebar]:   # Borders
             label.setStyleSheet("border: 1px solid red;")
 
         main_layout.addWidget(top_bar, 0, 1)
-        main_layout.addWidget(live_video, 2, 1)
+        main_layout.addWidget(self.live_video, 2, 1)
         main_layout.addWidget(bottom_menu, 4, 1)
         main_layout.addWidget(sidebar, 0, 3, 5, 1)  # spans all 5 rows
         
@@ -54,8 +62,78 @@ class MainWindow(QMainWindow):
         main_layout.setRowStretch(3, 1)   # blank gap
         main_layout.setRowStretch(4, 16)  # bottom menu
         
+        ##### FOR WHEN WINDOW IS RESIZED #####
         
+    def resizeEvent(self, event):
+        pixmap = load_image_with_box(
+            r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\10_104001002E88FE00_tile_10.png",
+            box=(50, 50, 200, 200),
+            label_text="Plane",
+            confidence=0.87
+        )
+        available_size = event.size()  # the window's new overall size, not live_video's own
+        target_size = self.live_video.size()
+        scaled = pixmap.scaled(
+            target_size.width(),
+            target_size.height(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.live_video.setPixmap(scaled)
+        super().resizeEvent(event)
         
+############### LOAD IMAGE WITH BOX ###############
+
+def load_image_with_box(path, box, label_text, confidence):
+    img = cv2.imread(path)
+    
+    x1, y1, x2, y2 = box
+    cv2.rectangle(img, (x1, y1), (x2, y2), (180, 0, 180), 3) # 180, 0, 180 is BGR
+    
+    test = f"{label_text}   {confidence:.2f}"
+    cv2.putText(img, label_text, (x1, y2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (180, 0, 180), 2)
+        
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    h, w, ch = img_rgb.shape
+    qimg = QImage(img_rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
+    return QPixmap.fromImage(qimg)
+
+############### GET THE DETECTION ###############
+
+def get_real_detection(path):
+    img_tensor = load_image_tensor(path)
+    
+    # Extract model_a, no need to track gradients
+    with torch.no_grad():
+        raw = models[0](img_tensor)
+
+    # reuse decode_output's internal logic but keep box coordinates too
+    detect_layer = models[0].model[-1]
+    preds = raw[0] if isinstance(raw, tuple) else raw
+    preds = preds.transpose(1, 2)
+    out = detect_layer.postprocess(preds)[0]
+    mask = out[:, 4] > 0.25
+    out = out[mask]
+
+    if out.shape[0] == 0:
+        return None
+
+    # just grab the single highest-confidence detection for now
+    best_idx = out[:, 4].argmax()
+    row = out[best_idx]
+    cx, cy, w, h = row[0].item(), row[1].item(), row[2].item(), row[3].item()
+    conf = row[4].item()
+    cls = int(row[5].item())
+
+    x1 = int(cx - w / 2)
+    y1 = int(cy - h / 2)
+    x2 = int(cx + w / 2)
+    y2 = int(cy + h / 2)
+
+    return (x1, y1, x2, y2), cls, conf
+
+############### MAIN CODE ###############
+
 app = QApplication(sys.argv)    # Engine to power GUI
 window = MainWindow()           # Create instance of class window
 window.show()                   # Show da window
