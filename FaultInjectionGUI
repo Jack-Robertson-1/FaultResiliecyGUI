@@ -4,6 +4,8 @@ from PyQt6.QtWidgets import QWidget, QGridLayout, QLabel
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSizePolicy
+from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+from PyQt6.QtGui import QColor
 import cv2
 from PyQt6.QtGui import QImage
 import torch
@@ -60,15 +62,30 @@ class MainWindow(QMainWindow):
                     stop: 0 #1D1E27,
                     stop: 1 #121319
                 );
-                border: 1px solid red;
+                border: none;
+                border-left: 3px solid #B5C6FF;
             }
         """)
+        
+        # Sidebar Border Glow
+        glow = QGraphicsDropShadowEffect()
+        glow.setBlurRadius(15)
+        glow.setColor(QColor(181, 198, 255, 70))   # B5C6FF, faint
+        glow.setOffset(-3, 0)   # shifted LEFT - glow sits right on/outside the left border
+        sidebar.setGraphicsEffect(glow)
 
         # Show Image
         self.live_video = QLabel()
         self.live_video.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         self.live_video.setScaledContents(False)
         self.live_video.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Glow around live video box
+        glow = QGraphicsDropShadowEffect()
+        glow.setBlurRadius(25)
+        glow.setColor(QColor(42, 46, 60, 160))   # white, partially transparent
+        glow.setOffset(0, 0)   # centered glow, not a drop shadow to one side
+        self.live_video.setGraphicsEffect(glow)
 
         for label in [top_bar, bottom_menu]:
             label.setStyleSheet("background: transparent; border: 1px solid red;") # Make transparent
@@ -79,9 +96,9 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(sidebar, 0, 3, 5, 1)  # spans all 5 rows
 
         main_layout.setColumnStretch(0, 1)   # left blank margin
-        main_layout.setColumnStretch(1, 18)  # center content column - gets most space
+        main_layout.setColumnStretch(1, 36)  # center content column - gets most space
         main_layout.setColumnStretch(2, 1)   # right blank margin
-        main_layout.setColumnStretch(3, 9)   # sidebar
+        main_layout.setColumnStretch(3, 16)   # sidebar
 
         main_layout.setRowStretch(0, 8)   # top bar
         main_layout.setRowStretch(1, 1)   # blank gap
