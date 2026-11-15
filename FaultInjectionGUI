@@ -9,6 +9,7 @@ from PyQt6.QtGui import QImage
 import torch
 from models import models
 from decode import load_image_tensor, decode_output
+import colorsys
 
 ############### MAIN WINDOW ###############
 
@@ -37,7 +38,7 @@ class MainWindow(QMainWindow):
         # Show Image
         self.live_video = QLabel()
         self.live_video.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-        pixmap = QPixmap(r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\10_104001002E88FE00_tile_10.png")
+        pixmap = QPixmap(r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\108_10400100457A8A00_tile_68.png")
         self.live_video.setPixmap(pixmap)
         self.live_video.setScaledContents(False)
         self.live_video.setAlignment(Qt.AlignmentFlag.AlignCenter) # Make it fit
@@ -62,16 +63,13 @@ class MainWindow(QMainWindow):
         main_layout.setRowStretch(3, 1)   # blank gap
         main_layout.setRowStretch(4, 16)  # bottom menu
         
-        ##### FOR WHEN WINDOW IS RESIZED #####
+    ##### FOR WHEN WINDOW IS RESIZED #####
         
     def resizeEvent(self, event):
-        pixmap = load_image_with_box(
-            r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\10_104001002E88FE00_tile_10.png",
-            box=(50, 50, 200, 200),
-            label_text="Plane",
-            confidence=0.87
-        )
-        available_size = event.size()  # the window's new overall size, not live_video's own
+        path = r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\108_10400100457A8A00_tile_68.png"
+        detections, img_array = get_real_detection(path)
+        pixmap = load_image_with_box(img_array, detections)
+
         target_size = self.live_video.size()
         scaled = pixmap.scaled(
             target_size.width(),
@@ -84,15 +82,14 @@ class MainWindow(QMainWindow):
         
 ############### LOAD IMAGE WITH BOX ###############
 
-def load_image_with_box(path, box, label_text, confidence):
-    img = cv2.imread(path)
-    
-    x1, y1, x2, y2 = box
-    cv2.rectangle(img, (x1, y1), (x2, y2), (180, 0, 180), 3) # 180, 0, 180 is BGR
-    
-    test = f"{label_text}   {confidence:.2f}"
-    cv2.putText(img, label_text, (x1, y2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (180, 0, 180), 2)
-        
+def load_image_with_box(img_array, detections):
+    img = img_array.copy()
+    for (x1, y1, x2, y2), cls, conf in detections:
+        color = get_class_color(cls)
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, 1)
+        text = f"{cls}   {conf:.2f}"
+        cv2.putText(img, text, (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
+
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     h, w, ch = img_rgb.shape
     qimg = QImage(img_rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
@@ -102,12 +99,10 @@ def load_image_with_box(path, box, label_text, confidence):
 
 def get_real_detection(path):
     img_tensor = load_image_tensor(path)
-    
-    # Extract model_a, no need to track gradients
+
     with torch.no_grad():
         raw = models[0](img_tensor)
 
-    # reuse decode_output's internal logic but keep box coordinates too
     detect_layer = models[0].model[-1]
     preds = raw[0] if isinstance(raw, tuple) else raw
     preds = preds.transpose(1, 2)
@@ -115,23 +110,29 @@ def get_real_detection(path):
     mask = out[:, 4] > 0.25
     out = out[mask]
 
-    if out.shape[0] == 0:
-        return None
+    img_array = (img_tensor[0].permute(1, 2, 0).cpu().numpy() * 255).astype("uint8")
+    img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
 
-    # just grab the single highest-confidence detection for now
-    best_idx = out[:, 4].argmax()
-    row = out[best_idx]
-    cx, cy, w, h = row[0].item(), row[1].item(), row[2].item(), row[3].item()
-    conf = row[4].item()
-    cls = int(row[5].item())
+    detections = []
+    for row in out:
+        cx, cy, w, h = row[0].item(), row[1].item(), row[2].item(), row[3].item()
+        conf = row[4].item()
+        cls = int(row[5].item())
+        x1 = int(cx - w / 2)
+        y1 = int(cy - h / 2)
+        x2 = int(cx + w / 2)
+        y2 = int(cy + h / 2)
+        detections.append(((x1, y1, x2, y2), cls, conf))
 
-    x1 = int(cx - w / 2)
-    y1 = int(cy - h / 2)
-    x2 = int(cx + w / 2)
-    y2 = int(cy + h / 2)
+    return detections, img_array
 
-    return (x1, y1, x2, y2), cls, conf
+############### PRETTY COLORS ###############
 
+def get_class_color(cls):
+    golden_ratio = 0.618033988749895
+    hue = (cls * golden_ratio) % 1.0
+    r, g, b = colorsys.hsv_to_rgb(hue, 0.85, 1.0)
+    return (int(b * 255), int(g * 255), int(r * 255))
 ############### MAIN CODE ###############
 
 app = QApplication(sys.argv)    # Engine to power GUI
