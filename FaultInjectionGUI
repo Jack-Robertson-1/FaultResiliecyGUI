@@ -77,9 +77,9 @@ class MainWindow(QMainWindow):
         sidebar.setStyleSheet("""
             QLabel {
                 background: qradialgradient(
-                    cx: 0.5, cy: 0.5, radius: 1.0, fx: 0.5, fy: 0.5,
+                    cx: 0.5, cy: 0.5, radius: 0.5, fx: 0.5, fy: 0.5,
                     stop: 0 #1D1E27,
-                    stop: 1 #121319
+                    stop: 1 #14151C
                 );
                 border: none;
                 border-left: 3px solid #B5C6FF;
@@ -117,7 +117,7 @@ class MainWindow(QMainWindow):
 
         main_layout.setColumnStretch(0, 1)   # left blank margin
         main_layout.setColumnStretch(1, 36)  # center content column - gets most space
-        main_layout.setColumnStretch(2, 1)   # right blank margin
+        main_layout.setColumnStretch(2, 2)   # right blank margin
         main_layout.setColumnStretch(3, 16)   # sidebar
 
         main_layout.setRowStretch(0, 8)   # top bar
