@@ -6,6 +6,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QSizePolicy
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect
 from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtGui import QPainter, QPainterPath, QColor, QBrush
+from PyQt6.QtCore import QPointF
 import cv2
 from PyQt6.QtGui import QImage
 import torch
@@ -51,9 +54,25 @@ class MainWindow(QMainWindow):
         # For Grid lines
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Use text as placeholder
-        top_bar = QLabel("TOP BAR")
-        bottom_menu = QLabel("BOTTOM MENU")
+        # Make the top bar a trapezoid
+        top_bar = TrapezoidBar()
+
+        top_bar_shadow = QGraphicsDropShadowEffect()
+        top_bar_shadow.setBlurRadius(30)
+        top_bar_shadow.setColor(QColor(0, 0, 0, 200))   # dark, mostly opaque
+        top_bar_shadow.setOffset(0, 8)                   # shifted down - shadow falls below the shape
+        top_bar.setGraphicsEffect(top_bar_shadow)
+
+        # Make bottom menu bar
+        bottom_menu = BottomMenuBar()
+        
+        bottom_menu_shadow = QGraphicsDropShadowEffect()
+        bottom_menu_shadow.setBlurRadius(30)
+        bottom_menu_shadow.setColor(QColor(0, 0, 0, 200))   # dark, mostly opaque
+        bottom_menu_shadow.setOffset(0, 8)                   # shifted down - shadow falls below the shape
+        bottom_menu.setGraphicsEffect(bottom_menu_shadow)
+        
+        # Make sidebar
         sidebar = QLabel("SIDEBAR")
         sidebar.setStyleSheet("""
             QLabel {
@@ -79,6 +98,7 @@ class MainWindow(QMainWindow):
         self.live_video.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         self.live_video.setScaledContents(False)
         self.live_video.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.live_video.setStyleSheet("border: 1px solid white; background: transparent;")
         
         # Glow around live video box
         glow = QGraphicsDropShadowEffect()
@@ -102,7 +122,7 @@ class MainWindow(QMainWindow):
 
         main_layout.setRowStretch(0, 8)   # top bar
         main_layout.setRowStretch(1, 1)   # blank gap
-        main_layout.setRowStretch(2, 30)  # video - gets most vertical space
+        main_layout.setRowStretch(2, 40)  # video - gets most vertical space
         main_layout.setRowStretch(3, 1)   # blank gap
         main_layout.setRowStretch(4, 16)  # bottom menu
 
@@ -151,6 +171,56 @@ class MainWindow(QMainWindow):
             Qt.TransformationMode.SmoothTransformation
         )
         self.live_video.setPixmap(scaled)
+        
+############### DRAW A TRAPEZOID ###############
+
+class TrapezoidBar(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(60)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        w = self.width()
+        h = self.height()
+        cut = 40
+
+        path = QPainterPath()
+        path.moveTo(QPointF(0, 0))          # top-left, full width
+        path.lineTo(QPointF(w, 0))          # top-right, full width
+        path.lineTo(QPointF(w - cut, h))    # bottom-right, pulled inward
+        path.lineTo(QPointF(cut, h))        # bottom-left, pulled inward
+        path.closeSubpath()
+
+        painter.fillPath(path, QBrush(QColor("#494E6B")))
+        
+############### DRAW BOTTOM MENU SHAPE ###############
+
+class BottomMenuBar(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(60)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        w = self.width()
+        h = self.height()
+        corner_cut = 20   # size of the 45-degree cut - equal in both directions for a true 45°
+
+        path = QPainterPath()
+        path.moveTo(QPointF(corner_cut, 0))           # start after the top-left cut
+        path.lineTo(QPointF(w - corner_cut, 0))       # top edge, stopping before top-right cut
+        path.lineTo(QPointF(w, corner_cut))           # diagonal cut on top-right
+        path.lineTo(QPointF(w, h))                    # right edge, straight down
+        path.lineTo(QPointF(0, h))                    # bottom edge, straight across
+        path.lineTo(QPointF(0, corner_cut))           # left edge, straight up
+        path.closeSubpath()                           # diagonal cut on top-left, back to start
+
+        painter.fillPath(path, QBrush(QColor("#30365D")))
 
 ############### LOAD IMAGE WITH BOXES (faulty + non-faulty) ###############
 
