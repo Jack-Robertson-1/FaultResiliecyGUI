@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QPainterPath, QColor, QBrush
 from PyQt6.QtCore import QPointF
 from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QComboBox
 import cv2
 from PyQt6.QtGui import QImage
 import torch
@@ -102,6 +103,36 @@ class MainWindow(QMainWindow):
         sidebar_title.setParent(sidebar)
         sidebar_title.move(20, 15)
         sidebar_title.adjustSize()
+        
+        # Add sidebar combo boxes
+        fault_type_label = QLabel("Fault Injection Type")
+        fault_type_label.setFont(QFont("Gadugi", 14))
+        fault_type_label.setStyleSheet("color: #FCB048; background: transparent; border: none;")
+        fault_type_label.setParent(sidebar)
+        fault_type_label.move(35, 90)
+        fault_type_label.adjustSize()
+
+        fault_type_dropdown = QComboBox(sidebar)
+        fault_type_dropdown.addItems([
+            "1 Bit", "2 Bits", "3 Bits", "4 Bits", "5 Bits", "6 Bits", "7 Bits", "Stuck Bit"
+        ])
+        fault_type_dropdown.move(35, 120)
+        fault_type_dropdown.setFixedWidth(260)
+
+        # Choose Resilience Method label + dropdown
+        resilience_label = QLabel("Choose Resilience Method")
+        resilience_label.setFont(QFont("Gadugi", 14))
+        resilience_label.setStyleSheet("color: #FCB048; background: transparent; border: none;")
+        resilience_label.setParent(sidebar)
+        resilience_label.move(35, 165)
+        resilience_label.adjustSize()
+
+        resilience_dropdown = QComboBox(sidebar)
+        resilience_dropdown.addItems([
+            "None", "TMR", "DWC w/ Retry + Vote", "Weight ECC"
+        ])
+        resilience_dropdown.move(35, 195)
+        resilience_dropdown.setFixedWidth(260)
         
         # Sidebar Border Glow
         glow = QGraphicsDropShadowEffect()
