@@ -9,6 +9,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtGui import QPainter, QPainterPath, QColor, QBrush
 from PyQt6.QtCore import QPointF
+from PyQt6.QtGui import QFont
 import cv2
 from PyQt6.QtGui import QImage
 import torch
@@ -85,6 +86,22 @@ class MainWindow(QMainWindow):
                 border-left: 3px solid #B5C6FF;
             }
         """)
+        
+        # Sidebar Title
+        sidebar_title = QLabel()
+        sidebar_title.setTextFormat(Qt.TextFormat.RichText)
+        sidebar_title.setText(
+            '<span style="color: white;">Fault </span>'
+            '<span style="color: #E8692A;">Tolerance </span>'
+            '<span style="color: white;">Menu</span>'
+        )
+        sidebar_title.setFont(QFont("Segoe UI Black", 20, QFont.Weight.Bold))
+        sidebar_title.setStyleSheet("background: transparent; border: none;")
+        
+        # Make title bound of sidebar
+        sidebar_title.setParent(sidebar)
+        sidebar_title.move(20, 15)
+        sidebar_title.adjustSize()
         
         # Sidebar Border Glow
         glow = QGraphicsDropShadowEffect()
