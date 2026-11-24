@@ -74,14 +74,32 @@ class MainWindow(QMainWindow):
         # For Grid lines
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Make the top bar a trapezoid
-        top_bar = TrapezoidBar()
+        # ******************************************************
+        # RESTRUCTURE: split into two video columns (gold/fault)
+        # instead of one trapezoid + one video label
+        # ******************************************************
 
-        top_bar_shadow = QGraphicsDropShadowEffect()
-        top_bar_shadow.setBlurRadius(30)
-        top_bar_shadow.setColor(QColor(0, 0, 0, 200))   # dark, mostly opaque
-        top_bar_shadow.setOffset(0, 8)                   # shifted down - shadow falls below the shape
-        top_bar.setGraphicsEffect(top_bar_shadow)
+        # Make the top bar a trapezoid (GOLD side)
+        top_bar_gold = TrapezoidBar()
+
+        top_bar_gold_shadow = QGraphicsDropShadowEffect()
+        top_bar_gold_shadow.setBlurRadius(20)
+        top_bar_gold_shadow.setColor(QColor(0, 0, 0, 120))   # dark, mostly opaque
+        top_bar_gold_shadow.setOffset(0, 6)                   # shifted down - shadow falls below the shape
+        top_bar_gold.setGraphicsEffect(top_bar_gold_shadow)
+
+        # Make the top bar a trapezoid (FAULT side)
+        top_bar_fault = TrapezoidBar()
+
+        top_bar_fault_shadow = QGraphicsDropShadowEffect()
+        top_bar_fault_shadow.setBlurRadius(20)
+        top_bar_fault_shadow.setColor(QColor(0, 0, 0, 120))   # dark, mostly opaque
+        top_bar_fault_shadow.setOffset(0, 6)                   # shifted down - shadow falls below the shape
+        top_bar_fault.setGraphicsEffect(top_bar_fault_shadow)
+
+        # ******************************************************
+        # END RESTRUCTURE (top bars)
+        # ******************************************************
 
         # Make bottom menu bar
         bottom_menu = BottomMenuBar()
@@ -221,32 +239,67 @@ class MainWindow(QMainWindow):
 
         self.sidebar = sidebar
 
-        # Show Image
-        self.live_video = QLabel()
-        self.live_video.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-        self.live_video.setScaledContents(False)
-        self.live_video.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.live_video.setStyleSheet("border: 1px solid white; background: transparent;")
-        
-        # Glow around live video box
-        glow = QGraphicsDropShadowEffect()
-        glow.setBlurRadius(25)
-        glow.setColor(QColor(42, 46, 60, 160))   # white, partially transparent
-        glow.setOffset(0, 0)   # centered glow, not a drop shadow to one side
-        self.live_video.setGraphicsEffect(glow)
+        # ******************************************************
+        # RESTRUCTURE: two video labels (gold/fault) instead of
+        # one self.live_video
+        # ******************************************************
 
-        for label in [top_bar, bottom_menu]:
+        # Show Image (GOLD side)
+        self.live_video_gold = QLabel()
+        self.live_video_gold.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.live_video_gold.setScaledContents(False)
+        self.live_video_gold.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.live_video_gold.setStyleSheet("border: 1px solid white; background: transparent;")
+
+        glow_gold = QGraphicsDropShadowEffect()
+        glow_gold.setBlurRadius(25)
+        glow_gold.setColor(QColor(42, 46, 60, 160))   # white, partially transparent
+        glow_gold.setOffset(0, 0)   # centered glow, not a drop shadow to one side
+        self.live_video_gold.setGraphicsEffect(glow_gold)
+
+        # Show Image (FAULT side)
+        self.live_video_fault = QLabel()
+        self.live_video_fault.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.live_video_fault.setScaledContents(False)
+        self.live_video_fault.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.live_video_fault.setStyleSheet("border: 1px solid white; background: transparent;")
+
+        glow_fault = QGraphicsDropShadowEffect()
+        glow_fault.setBlurRadius(25)
+        glow_fault.setColor(QColor(42, 46, 60, 160))   # white, partially transparent
+        glow_fault.setOffset(0, 0)   # centered glow, not a drop shadow to one side
+        self.live_video_fault.setGraphicsEffect(glow_fault)
+
+        # ******************************************************
+        # END RESTRUCTURE (video labels)
+        # ******************************************************
+
+        for label in [top_bar_gold, top_bar_fault, bottom_menu]:
             label.setStyleSheet("background: transparent; border: 1px solid red;") # Make transparent
 
-        main_layout.addWidget(top_bar, 0, 1)
-        main_layout.addWidget(self.live_video, 2, 1)
-        main_layout.addWidget(bottom_menu, 4, 1)
-        main_layout.addWidget(sidebar, 0, 3, 5, 1)  # spans all 5 rows
+        # ******************************************************
+        # RESTRUCTURE: grid now has 6 columns instead of 4 -
+        # col0 margin | col1 gold video | col2 gap | col3 fault video | col4 margin | col5 sidebar
+        # bottom menu spans col1 through col3 as ONE bar
+        # ******************************************************
 
-        main_layout.setColumnStretch(0, 1)   # left blank margin
-        main_layout.setColumnStretch(1, 36)  # center content column - gets most space
-        main_layout.setColumnStretch(2, 2)   # right blank margin
-        main_layout.setColumnStretch(3, 16)   # sidebar
+        main_layout.addWidget(top_bar_gold, 0, 1)
+        main_layout.addWidget(top_bar_fault, 0, 3)
+        main_layout.addWidget(self.live_video_gold, 2, 1)
+        main_layout.addWidget(self.live_video_fault, 2, 3)
+        main_layout.addWidget(bottom_menu, 4, 1, 1, 3)   # spans 1 row, 3 columns
+        main_layout.addWidget(sidebar, 0, 5, 5, 1)  # spans all 5 rows, now column 5
+
+        main_layout.setColumnStretch(0, 1)    # left blank margin
+        main_layout.setColumnStretch(1, 18)   # gold video column
+        main_layout.setColumnStretch(2, 1)    # gap between the two videos
+        main_layout.setColumnStretch(3, 18)   # fault video column
+        main_layout.setColumnStretch(4, 2)    # right blank margin
+        main_layout.setColumnStretch(5, 16)   # sidebar
+
+        # ******************************************************
+        # END RESTRUCTURE (grid columns)
+        # ******************************************************
 
         main_layout.setRowStretch(0, 8)   # top bar
         main_layout.setRowStretch(1, 1)   # blank gap
@@ -261,10 +314,12 @@ class MainWindow(QMainWindow):
         # --- Cache: run inference ONCE, store the boxed base pixmap ---
         # Everything downstream (resize) just rescales this cached pixmap,
         # it never re-runs the model.
-        self.base_pixmap = None
+        # ******************************************************
+        # RESTRUCTURE: two cached pixmaps (gold/fault) instead of one
+        # ******************************************************
+        self.base_pixmap_gold = None
+        self.base_pixmap_fault = None
         self.refresh_detections()
-        
-        
 
     ##### RUN INFERENCE AND CACHE THE RESULT #####
 
@@ -278,11 +333,19 @@ class MainWindow(QMainWindow):
         """
         nonfaulty_detections, img_array = get_real_detection(IMAGE_PATH)
 
-        self.base_pixmap = load_image_with_boxes(
+        boxed_pixmap = load_image_with_boxes(
             img_array,
             nonfaulty_detections,
             faulty_detections
         )
+
+        # ******************************************************
+        # RESTRUCTURE: same image/boxes cached for BOTH sides for
+        # now - gold and fault aren't actually different yet, that's
+        # step 2 (wiring in a real second inference call)
+        # ******************************************************
+        self.base_pixmap_gold = boxed_pixmap
+        self.base_pixmap_fault = boxed_pixmap
 
         self._rescale_to_label()
 
@@ -295,10 +358,10 @@ class MainWindow(QMainWindow):
 
     def _reposition_sidebar_bars(self):
         sidebar_height = self.sidebar.height()
-        bottom_margin = 65   # was 60, +5 to shift everything up 5px
+        bottom_margin = 65   # increased from 40 - more breathing room from the bottom edge
 
         sdc_y = sidebar_height - bottom_margin
-        latency_y = sdc_y - 80
+        latency_y = sdc_y - 80   # increased from 70 - more vertical gap between the two bars
 
         self.latency_label.move(24, latency_y)
         self.latency_bar.move(24, latency_y + 25)
@@ -309,17 +372,28 @@ class MainWindow(QMainWindow):
         self.sdc_value.move(275, sdc_y + 20)
 
     def _rescale_to_label(self):
-        if self.base_pixmap is None:
-            return
+        # ******************************************************
+        # RESTRUCTURE: rescales BOTH video labels now, not just one
+        # ******************************************************
+        if self.base_pixmap_gold is not None:
+            target_size = self.live_video_gold.size()
+            scaled_gold = self.base_pixmap_gold.scaled(
+                target_size.width(),
+                target_size.height(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.live_video_gold.setPixmap(scaled_gold)
 
-        target_size = self.live_video.size()
-        scaled = self.base_pixmap.scaled(
-            target_size.width(),
-            target_size.height(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.live_video.setPixmap(scaled)
+        if self.base_pixmap_fault is not None:
+            target_size = self.live_video_fault.size()
+            scaled_fault = self.base_pixmap_fault.scaled(
+                target_size.width(),
+                target_size.height(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.live_video_fault.setPixmap(scaled_fault)
         
 ############### DRAW A TRAPEZOID ###############
 
