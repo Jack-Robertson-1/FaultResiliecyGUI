@@ -11,12 +11,14 @@ from PyQt6.QtGui import QPainter, QPainterPath, QColor, QBrush
 from PyQt6.QtCore import QPointF
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QComboBox
+
 import cv2
 from PyQt6.QtGui import QImage
 import torch
 from models import models
 from decode import load_image_tensor, decode_output
 import colorsys
+from PyQt6.QtWidgets import QProgressBar
 
 IMAGE_PATH = r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\108_10400100457A8A00_tile_68.png"
 
@@ -27,6 +29,22 @@ COLOR_FAULTY = (0, 0, 255)      # red
 # Label text styling
 LABEL_FONT = cv2.FONT_HERSHEY_DUPLEX   # cleaner, less blocky than SIMPLEX
 LABEL_SCALE = 0.4                       # smaller than the previous 0.6
+
+# Dropdown Style
+dropdown_style = """
+    QComboBox {
+        background-color: white;
+        color: black;
+        border: 1px solid gray;
+        padding: 4px;
+    }
+    QComboBox QAbstractItemView {
+        background-color: white;
+        color: black;
+        selection-background-color: #B5C6FF;
+        selection-color: black;
+    }
+"""
 
 ############### MAIN WINDOW ###############
 
@@ -69,13 +87,13 @@ class MainWindow(QMainWindow):
         bottom_menu = BottomMenuBar()
         
         bottom_menu_shadow = QGraphicsDropShadowEffect()
-        bottom_menu_shadow.setBlurRadius(30)
-        bottom_menu_shadow.setColor(QColor(0, 0, 0, 200))   # dark, mostly opaque
-        bottom_menu_shadow.setOffset(0, 8)                   # shifted down - shadow falls below the shape
+        bottom_menu_shadow.setBlurRadius(20)
+        bottom_menu_shadow.setColor(QColor(0, 0, 0, 120))   # dark, mostly opaque
+        bottom_menu_shadow.setOffset(0, 6)                   # shifted down - shadow falls below the shape
         bottom_menu.setGraphicsEffect(bottom_menu_shadow)
         
         # Make sidebar
-        sidebar = QLabel("SIDEBAR")
+        sidebar = QLabel("")
         sidebar.setStyleSheet("""
             QLabel {
                 background: qradialgradient(
@@ -109,14 +127,14 @@ class MainWindow(QMainWindow):
         fault_type_label.setFont(QFont("Gadugi", 14))
         fault_type_label.setStyleSheet("color: #FCB048; background: transparent; border: none;")
         fault_type_label.setParent(sidebar)
-        fault_type_label.move(35, 90)
+        fault_type_label.move(24, 90)
         fault_type_label.adjustSize()
 
         fault_type_dropdown = QComboBox(sidebar)
         fault_type_dropdown.addItems([
             "1 Bit", "2 Bits", "3 Bits", "4 Bits", "5 Bits", "6 Bits", "7 Bits", "Stuck Bit"
         ])
-        fault_type_dropdown.move(35, 120)
+        fault_type_dropdown.move(24, 120)
         fault_type_dropdown.setFixedWidth(260)
 
         # Choose Resilience Method label + dropdown
@@ -124,14 +142,14 @@ class MainWindow(QMainWindow):
         resilience_label.setFont(QFont("Gadugi", 14))
         resilience_label.setStyleSheet("color: #FCB048; background: transparent; border: none;")
         resilience_label.setParent(sidebar)
-        resilience_label.move(35, 165)
+        resilience_label.move(24, 165)
         resilience_label.adjustSize()
 
         resilience_dropdown = QComboBox(sidebar)
         resilience_dropdown.addItems([
             "None", "TMR", "DWC w/ Retry + Vote", "Weight ECC"
         ])
-        resilience_dropdown.move(35, 195)
+        resilience_dropdown.move(24, 195)
         resilience_dropdown.setFixedWidth(260)
         
         # Sidebar Border Glow
@@ -140,6 +158,68 @@ class MainWindow(QMainWindow):
         glow.setColor(QColor(181, 198, 255, 70))   # B5C6FF, faint
         glow.setOffset(-3, 0)   # shifted LEFT - glow sits right on/outside the left border
         sidebar.setGraphicsEffect(glow)
+
+        # Latency bar
+        self.latency_label = QLabel("Latency")
+        self.latency_label.setFont(QFont("HP Simplified Jpan", 14))
+        self.latency_label.setStyleSheet("color: #9CA3AF; background: transparent; border: none;")
+        self.latency_label.setParent(sidebar)
+        self.latency_label.adjustSize()
+
+        self.latency_bar = QProgressBar(sidebar)
+        self.latency_bar.setRange(0, 1000)
+        self.latency_bar.setValue(202)
+        self.latency_bar.setTextVisible(False)
+        self.latency_bar.setFixedSize(230, 10)
+        self.latency_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #2A2E3B;
+                border: none;
+                border-radius: 5px;
+            }
+            QProgressBar::chunk {
+                background-color: #E8692A;
+                border-radius: 5px;
+            }
+        """)
+
+        self.latency_value = QLabel("202ms")
+        self.latency_value.setFont(QFont("Segoe UI Black", 15, QFont.Weight.Bold))
+        self.latency_value.setStyleSheet("color: white; background: transparent; border: none;")
+        self.latency_value.setParent(sidebar)
+        self.latency_value.adjustSize()
+
+        # SDC Rate bar
+        self.sdc_label = QLabel("SDC Rate %")
+        self.sdc_label.setFont(QFont("HP Simplified Jpan", 14))
+        self.sdc_label.setStyleSheet("color: #9CA3AF; background: transparent; border: none;")
+        self.sdc_label.setParent(sidebar)
+        self.sdc_label.adjustSize()
+
+        self.sdc_bar = QProgressBar(sidebar)
+        self.sdc_bar.setRange(0, 100)
+        self.sdc_bar.setValue(10)
+        self.sdc_bar.setTextVisible(False)
+        self.sdc_bar.setFixedSize(230, 10)
+        self.sdc_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #2A2E3B;
+                border: none;
+                border-radius: 5px;
+            }
+            QProgressBar::chunk {
+                background-color: #E8692A;
+                border-radius: 5px;
+            }
+        """)
+
+        self.sdc_value = QLabel("9.8%")
+        self.sdc_value.setFont(QFont("Segoe UI Black", 15, QFont.Weight.Bold))
+        self.sdc_value.setStyleSheet("color: white; background: transparent; border: none;")
+        self.sdc_value.setParent(sidebar)
+        self.sdc_value.adjustSize()
+
+        self.sidebar = sidebar
 
         # Show Image
         self.live_video = QLabel()
@@ -173,12 +253,18 @@ class MainWindow(QMainWindow):
         main_layout.setRowStretch(2, 40)  # video - gets most vertical space
         main_layout.setRowStretch(3, 1)   # blank gap
         main_layout.setRowStretch(4, 16)  # bottom menu
+        
+        # Update styles
+        fault_type_dropdown.setStyleSheet(dropdown_style)
+        resilience_dropdown.setStyleSheet(dropdown_style)
 
         # --- Cache: run inference ONCE, store the boxed base pixmap ---
         # Everything downstream (resize) just rescales this cached pixmap,
         # it never re-runs the model.
         self.base_pixmap = None
         self.refresh_detections()
+        
+        
 
     ##### RUN INFERENCE AND CACHE THE RESULT #####
 
@@ -203,9 +289,24 @@ class MainWindow(QMainWindow):
     ##### FOR WHEN WINDOW IS RESIZED #####
 
     def resizeEvent(self, event):
-        # Only rescales the already-cached pixmap - no inference here
         self._rescale_to_label()
+        self._reposition_sidebar_bars()
         super().resizeEvent(event)
+
+    def _reposition_sidebar_bars(self):
+        sidebar_height = self.sidebar.height()
+        bottom_margin = 65   # was 60, +5 to shift everything up 5px
+
+        sdc_y = sidebar_height - bottom_margin
+        latency_y = sdc_y - 80
+
+        self.latency_label.move(24, latency_y)
+        self.latency_bar.move(24, latency_y + 25)
+        self.latency_value.move(275, latency_y + 20)
+
+        self.sdc_label.move(24, sdc_y)
+        self.sdc_bar.move(24, sdc_y + 25)
+        self.sdc_value.move(275, sdc_y + 20)
 
     def _rescale_to_label(self):
         if self.base_pixmap is None:
