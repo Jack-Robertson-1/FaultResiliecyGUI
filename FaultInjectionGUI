@@ -74,11 +74,6 @@ class MainWindow(QMainWindow):
         # For Grid lines
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ******************************************************
-        # RESTRUCTURE: split into two video columns (gold/fault)
-        # instead of one trapezoid + one video label
-        # ******************************************************
-
         # Make the top bar a trapezoid (GOLD side)
         top_bar_gold = TrapezoidBar()
 
@@ -96,13 +91,35 @@ class MainWindow(QMainWindow):
         top_bar_fault_shadow.setColor(QColor(0, 0, 0, 120))   # dark, mostly opaque
         top_bar_fault_shadow.setOffset(0, 6)                   # shifted down - shadow falls below the shape
         top_bar_fault.setGraphicsEffect(top_bar_fault_shadow)
+        
+        # Object Count text, sitting on top of each trapezoid
+        self.gold_count_number = QLabel("40")
+        self.gold_count_number.setFont(QFont("HP Simplified Jpan", 29))
+        self.gold_count_number.setStyleSheet("color: white; background: transparent; border: none;")
+        self.gold_count_number.setParent(top_bar_gold)
+        self.gold_count_number.adjustSize()
 
-        # ******************************************************
-        # END RESTRUCTURE (top bars)
-        # ******************************************************
+        self.gold_count_label = QLabel("Object Count")
+        self.gold_count_label.setFont(QFont("HP Simplified Jpan", 19))
+        self.gold_count_label.setStyleSheet("color: #A9ACD3; background: transparent; border: none;")
+        self.gold_count_label.setParent(top_bar_gold)
+        self.gold_count_label.adjustSize()
+
+        self.fault_count_number = QLabel("40")
+        self.fault_count_number.setFont(QFont("HP Simplified Jpan", 29))
+        self.fault_count_number.setStyleSheet("color: white; background: transparent; border: none;")
+        self.fault_count_number.setParent(top_bar_fault)
+        self.fault_count_number.adjustSize()
+
+        self.fault_count_label = QLabel("Object Count")
+        self.fault_count_label.setFont(QFont("HP Simplified Jpan", 19))
+        self.fault_count_label.setStyleSheet("color: #A9ACD3; background: transparent; border: none;")
+        self.fault_count_label.setParent(top_bar_fault)
+        self.fault_count_label.adjustSize()
 
         # Make bottom menu bar
         bottom_menu = BottomMenuBar()
+        self.bottom_menu = bottom_menu
         
         bottom_menu_shadow = QGraphicsDropShadowEffect()
         bottom_menu_shadow.setBlurRadius(20)
@@ -239,11 +256,6 @@ class MainWindow(QMainWindow):
 
         self.sidebar = sidebar
 
-        # ******************************************************
-        # RESTRUCTURE: two video labels (gold/fault) instead of
-        # one self.live_video
-        # ******************************************************
-
         # Show Image (GOLD side)
         self.live_video_gold = QLabel()
         self.live_video_gold.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
@@ -269,19 +281,42 @@ class MainWindow(QMainWindow):
         glow_fault.setColor(QColor(42, 46, 60, 160))   # white, partially transparent
         glow_fault.setOffset(0, 0)   # centered glow, not a drop shadow to one side
         self.live_video_fault.setGraphicsEffect(glow_fault)
+        
+        # "GOLDEN BASELINE" / "FAULTED RUN" labels, sitting just below each video
+        self.gold_tag = QLabel("GOLDEN BASELINE")
+        self.gold_tag.setFont(QFont("Gadugi", 17, QFont.Weight.Bold))
+        self.gold_tag.setStyleSheet("""
+            background-color: #CB8C27;
+            color: white;
+            padding: 6px 14px;
+        """)
+        self.gold_tag.setParent(central_widget)
+        self.gold_tag.adjustSize()
 
-        # ******************************************************
-        # END RESTRUCTURE (video labels)
-        # ******************************************************
+        self.fault_tag = QLabel("FAULTED RUN")
+        self.fault_tag.setFont(QFont("Gadugi", 17, QFont.Weight.Bold))
+        self.fault_tag.setStyleSheet("""
+            background-color: #C6563F;
+            color: white;
+            padding: 6px 14px;
+        """)
+        self.fault_tag.setParent(central_widget)
+        self.fault_tag.adjustSize()
+        
+        gold_tag_shadow = QGraphicsDropShadowEffect()
+        gold_tag_shadow.setBlurRadius(15)
+        gold_tag_shadow.setColor(QColor(0, 0, 0, 150))
+        gold_tag_shadow.setOffset(0, 4)
+        self.gold_tag.setGraphicsEffect(gold_tag_shadow)
+
+        fault_tag_shadow = QGraphicsDropShadowEffect()
+        fault_tag_shadow.setBlurRadius(15)
+        fault_tag_shadow.setColor(QColor(0, 0, 0, 150))
+        fault_tag_shadow.setOffset(0, 4)
+        self.fault_tag.setGraphicsEffect(fault_tag_shadow)
 
         for label in [top_bar_gold, top_bar_fault, bottom_menu]:
             label.setStyleSheet("background: transparent; border: 1px solid red;") # Make transparent
-
-        # ******************************************************
-        # RESTRUCTURE: grid now has 6 columns instead of 4 -
-        # col0 margin | col1 gold video | col2 gap | col3 fault video | col4 margin | col5 sidebar
-        # bottom menu spans col1 through col3 as ONE bar
-        # ******************************************************
 
         main_layout.addWidget(top_bar_gold, 0, 1)
         main_layout.addWidget(top_bar_fault, 0, 3)
@@ -296,27 +331,16 @@ class MainWindow(QMainWindow):
         main_layout.setColumnStretch(3, 18)   # fault video column
         main_layout.setColumnStretch(4, 2)    # right blank margin
         main_layout.setColumnStretch(5, 16)   # sidebar
-
-        # ******************************************************
-        # END RESTRUCTURE (grid columns)
-        # ******************************************************
-
         main_layout.setRowStretch(0, 8)   # top bar
         main_layout.setRowStretch(1, 1)   # blank gap
         main_layout.setRowStretch(2, 40)  # video - gets most vertical space
-        main_layout.setRowStretch(3, 1)   # blank gap
+        main_layout.setRowStretch(3, 7)   # blank gap / boxes
         main_layout.setRowStretch(4, 16)  # bottom menu
         
         # Update styles
         fault_type_dropdown.setStyleSheet(dropdown_style)
         resilience_dropdown.setStyleSheet(dropdown_style)
 
-        # --- Cache: run inference ONCE, store the boxed base pixmap ---
-        # Everything downstream (resize) just rescales this cached pixmap,
-        # it never re-runs the model.
-        # ******************************************************
-        # RESTRUCTURE: two cached pixmaps (gold/fault) instead of one
-        # ******************************************************
         self.base_pixmap_gold = None
         self.base_pixmap_fault = None
         self.refresh_detections()
@@ -339,11 +363,6 @@ class MainWindow(QMainWindow):
             faulty_detections
         )
 
-        # ******************************************************
-        # RESTRUCTURE: same image/boxes cached for BOTH sides for
-        # now - gold and fault aren't actually different yet, that's
-        # step 2 (wiring in a real second inference call)
-        # ******************************************************
         self.base_pixmap_gold = boxed_pixmap
         self.base_pixmap_fault = boxed_pixmap
 
@@ -354,14 +373,56 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         self._rescale_to_label()
         self._reposition_sidebar_bars()
+        self._reposition_tags()
+        self._reposition_count_text()
         super().resizeEvent(event)
 
+    def _reposition_count_text(self):
+        left_margin = 55
+
+        gold_parent_height = self.gold_count_number.parentWidget().height()
+        number_y = (gold_parent_height - self.gold_count_number.height()) // 2
+
+        self.gold_count_number.move(left_margin, number_y)
+        self.gold_count_label.move(
+            left_margin + self.gold_count_number.width() + 5,
+            number_y + (self.gold_count_number.height() - self.gold_count_label.height()) // 2 + 5
+        )
+
+        fault_parent_height = self.fault_count_number.parentWidget().height()
+        fault_number_y = (fault_parent_height - self.fault_count_number.height()) // 2
+
+        self.fault_count_number.move(left_margin, fault_number_y)
+        self.fault_count_label.move(
+            left_margin + self.fault_count_number.width() + 5,
+            fault_number_y + (self.fault_count_number.height() - self.fault_count_label.height()) // 2 + 5
+        )
+    
+    def _reposition_tags(self):
+        gold_geo = self.live_video_gold.geometry()
+        fault_geo = self.live_video_fault.geometry()
+        menu_geo = self.bottom_menu.geometry()
+
+        # available vertical space between video bottom and menu top
+        gap_top = gold_geo.y() + gold_geo.height()
+        gap_bottom = menu_geo.y()
+        gap_height = gap_bottom - gap_top
+
+        # center the tag vertically within that gap, never overlapping either side
+        tag_y = gap_top + (gap_height - self.gold_tag.height()) // 2
+
+        gold_x = gold_geo.x() + (gold_geo.width() - self.gold_tag.width()) // 2
+        self.gold_tag.move(gold_x, tag_y)
+
+        fault_x = fault_geo.x() + (fault_geo.width() - self.fault_tag.width()) // 2
+        self.fault_tag.move(fault_x, tag_y)
+        
     def _reposition_sidebar_bars(self):
         sidebar_height = self.sidebar.height()
-        bottom_margin = 65   # increased from 40 - more breathing room from the bottom edge
+        bottom_margin = 65
 
         sdc_y = sidebar_height - bottom_margin
-        latency_y = sdc_y - 80   # increased from 70 - more vertical gap between the two bars
+        latency_y = sdc_y - 80
 
         self.latency_label.move(24, latency_y)
         self.latency_bar.move(24, latency_y + 25)
@@ -372,9 +433,7 @@ class MainWindow(QMainWindow):
         self.sdc_value.move(275, sdc_y + 20)
 
     def _rescale_to_label(self):
-        # ******************************************************
-        # RESTRUCTURE: rescales BOTH video labels now, not just one
-        # ******************************************************
+
         if self.base_pixmap_gold is not None:
             target_size = self.live_video_gold.size()
             scaled_gold = self.base_pixmap_gold.scaled(
