@@ -11,6 +11,7 @@ from PyQt6.QtGui import QPainter, QPainterPath, QColor, QBrush
 from PyQt6.QtCore import QPointF
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QComboBox
+from PyQt6.QtWidgets import QPushButton
 
 import cv2
 from PyQt6.QtGui import QImage
@@ -315,6 +316,28 @@ class MainWindow(QMainWindow):
         fault_tag_shadow.setOffset(0, 4)
         self.fault_tag.setGraphicsEffect(fault_tag_shadow)
 
+        # Run Inference Button
+        run_button = QPushButton("Run Inference")
+        run_button.setFont(QFont("Gadugi", 15))
+        run_button.setStyleSheet("""
+            QPushButton {
+                background-color: #E8692A;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: #D45E24;
+            }
+            QPushButton:pressed {
+                background-color: #BF521F;
+            }
+        """)
+        run_button.setParent(sidebar)
+        run_button.setFixedWidth(260)
+        run_button.move(24, 260)
+        
         for label in [top_bar_gold, top_bar_fault, bottom_menu]:
             label.setStyleSheet("background: transparent; border: 1px solid red;") # Make transparent
 
