@@ -24,6 +24,10 @@ from decode import load_image_tensor, decode_output
 import colorsys
 from PyQt6.QtWidgets import QProgressBar
 
+import random
+from faults import flip_bits, stuck_bit, flip_bits_count, stuck_bit_count
+from methods.ecc import apply_secded, restore_weight
+
 IMAGE_PATH = r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled\108_10400100457A8A00_tile_68.png"
 
 # Colors for faulty vs non-faulty boxes (BGR, since cv2 draws in BGR)
@@ -50,6 +54,14 @@ dropdown_style = """
     }
 """
 
+# Maps dropdown text -> either a bit count (int), "stuck", or None (no fault)
+FAULT_TYPE_MAP = {
+    "None": None,
+    "1 Bit": 1, "2 Bits": 2, "3 Bits": 3, "4 Bits": 4,
+    "5 Bits": 5, "6 Bits": 6, "7 Bits": 7,
+    "Stuck Bit": "stuck",
+}
+
 ############### MAIN WINDOW ###############
 
 class MainWindow(QMainWindow):
@@ -57,6 +69,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Fault Tolerance Display")
         self.resize(1300, 614)
+
+        # ####### tracks which image is currently loaded/displayed
+        self.current_image_path = IMAGE_PATH
 
         # Main widget to build on top off
         central_widget = QWidget()
@@ -97,7 +112,7 @@ class MainWindow(QMainWindow):
         top_bar_fault.setGraphicsEffect(top_bar_fault_shadow)
         
         # Object Count text, sitting on top of each trapezoid
-        self.gold_count_number = QLabel("40")
+        self.gold_count_number = QLabel("-")
         self.gold_count_number.setFont(QFont("HP Simplified Jpan", 29))
         self.gold_count_number.setStyleSheet("color: white; background: transparent; border: none;")
         self.gold_count_number.setParent(top_bar_gold)
@@ -109,7 +124,7 @@ class MainWindow(QMainWindow):
         self.gold_count_label.setParent(top_bar_gold)
         self.gold_count_label.adjustSize()
 
-        self.fault_count_number = QLabel("40")
+        self.fault_count_number = QLabel("-")
         self.fault_count_number.setFont(QFont("HP Simplified Jpan", 29))
         self.fault_count_number.setStyleSheet("color: white; background: transparent; border: none;")
         self.fault_count_number.setParent(top_bar_fault)
@@ -156,7 +171,8 @@ class MainWindow(QMainWindow):
         """)
         self.folder_button.move(20, 45)
         self.folder_button.setFixedSize(60, 60)
-        self.folder_button.clicked.connect(self.open_image_folder)
+        # ####### now opens an image file picker, not a folder picker
+        self.folder_button.clicked.connect(self.choose_image_dialog)
         
         # Make sidebar
         sidebar = QLabel("")
@@ -196,12 +212,12 @@ class MainWindow(QMainWindow):
         fault_type_label.move(24, 90)
         fault_type_label.adjustSize()
 
-        fault_type_dropdown = QComboBox(sidebar)
-        fault_type_dropdown.addItems([
-            "1 Bit", "2 Bits", "3 Bits", "4 Bits", "5 Bits", "6 Bits", "7 Bits", "Stuck Bit"
+        self.fault_type_dropdown = QComboBox(sidebar)
+        self.fault_type_dropdown.addItems([
+            "None", "1 Bit", "2 Bits", "3 Bits", "4 Bits", "5 Bits", "6 Bits", "7 Bits", "Stuck Bit"
         ])
-        fault_type_dropdown.move(24, 120)
-        fault_type_dropdown.setFixedWidth(260)
+        self.fault_type_dropdown.move(24, 120)
+        self.fault_type_dropdown.setFixedWidth(260)
 
         # Choose Resilience Method label + dropdown
         resilience_label = QLabel("Choose Resilience Method")
@@ -211,12 +227,12 @@ class MainWindow(QMainWindow):
         resilience_label.move(24, 165)
         resilience_label.adjustSize()
 
-        resilience_dropdown = QComboBox(sidebar)
-        resilience_dropdown.addItems([
+        self.resilience_dropdown = QComboBox(sidebar)
+        self.resilience_dropdown.addItems([
             "None", "TMR", "DWC w/ Retry + Vote", "Weight ECC"
         ])
-        resilience_dropdown.move(24, 195)
-        resilience_dropdown.setFixedWidth(260)
+        self.resilience_dropdown.move(24, 195)
+        self.resilience_dropdown.setFixedWidth(260)
         
         # Sidebar Border Glow
         glow = QGraphicsDropShadowEffect()
@@ -313,21 +329,21 @@ class MainWindow(QMainWindow):
         glow_fault.setOffset(0, 0)   # centered glow, not a drop shadow to one side
         self.live_video_fault.setGraphicsEffect(glow_fault)
         
-        # "GOLDEN BASELINE" / "FAULTED RUN" labels, sitting just below each video
-        self.gold_tag = QLabel("GOLDEN BASELINE")
+        # ####### left tag is now "FAULTY RUN" in orange, right tag is now "RESILIENT RUN" in green
+        self.gold_tag = QLabel("FAULTY RUN")
         self.gold_tag.setFont(QFont("Gadugi", 14, QFont.Weight.Bold))
         self.gold_tag.setStyleSheet("""
-            background-color: #CB8C27;
+            background-color: #E8692A;
             color: white;
             padding: 6px 14px;
         """)
         self.gold_tag.setParent(central_widget)
         self.gold_tag.adjustSize()
 
-        self.fault_tag = QLabel("FAULTED RUN")
+        self.fault_tag = QLabel("RESILIENT RUN")
         self.fault_tag.setFont(QFont("Gadugi", 14, QFont.Weight.Bold))
         self.fault_tag.setStyleSheet("""
-            background-color: #C6563F;
+            background-color: #2C752A;
             color: white;
             padding: 6px 14px;
         """)
@@ -367,6 +383,8 @@ class MainWindow(QMainWindow):
         run_button.setParent(sidebar)
         run_button.setFixedWidth(260)
         run_button.move(24, 260)
+        # ####### button now actually triggers inference, instead of it running automatically at startup
+        run_button.clicked.connect(self.run_inference)
         
         for label in [top_bar_gold, top_bar_fault, bottom_menu]:
             label.setStyleSheet("background: transparent; border: 1px solid red;") # Make transparent
@@ -391,45 +409,140 @@ class MainWindow(QMainWindow):
         main_layout.setRowStretch(4, 16)  # bottom menu
         
         # Update styles
-        fault_type_dropdown.setStyleSheet(dropdown_style)
-        resilience_dropdown.setStyleSheet(dropdown_style)
+        self.fault_type_dropdown.setStyleSheet(dropdown_style)
+        self.resilience_dropdown.setStyleSheet(dropdown_style)
 
         self.base_pixmap_gold = None
         self.base_pixmap_fault = None
-        self.refresh_detections()
+        # ####### on startup, just load the plain image with no boxes - inference only runs when the button is clicked
+        self.load_plain_image()
+        self._reposition_everything()
 
-    ##### RUN INFERENCE AND CACHE THE RESULT #####
+    ##### LOAD THE CURRENT IMAGE, NO BOXES YET #####
 
-    def refresh_detections(self, faulty_detections=None):
+    def load_plain_image(self):
         """
-        Runs inference once (or accepts pre-computed faulty detections to
-        compare against), draws both sets of boxes onto the image, and
-        caches the result as self.base_pixmap. Call this again only when
-        you actually want to re-run inference (new image, new fault
-        injected, etc.) - NOT on every resize.
+        Loads self.current_image_path into both displays with no bounding
+        boxes drawn, and resets the object-count text to a placeholder.
+        Called on startup and whenever a new image is chosen. Does NOT
+        run the model - that only happens in run_inference().
         """
-        nonfaulty_detections, img_array = get_real_detection(IMAGE_PATH)
+        plain_pixmap = get_display_image(self.current_image_path)
 
-        boxed_pixmap = load_image_with_boxes(
-            img_array,
-            nonfaulty_detections,
-            faulty_detections
-        )
+        self.base_pixmap_gold = plain_pixmap
+        self.base_pixmap_fault = plain_pixmap
 
-        self.base_pixmap_gold = boxed_pixmap
-        self.base_pixmap_fault = boxed_pixmap
+        self.gold_count_number.setText("-")
+        self.gold_count_number.adjustSize()
+        self.fault_count_number.setText("-")
+        self.fault_count_number.adjustSize()
 
         self._rescale_to_label()
 
-    ##### FOR WHEN WINDOW IS RESIZED #####
+    ##### FILE PICKER FOR CHOOSING A NEW IMAGE #####
+
+    def choose_image_dialog(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Choose Image",
+            r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled",
+            "Images (*.png *.jpg *.jpeg)"
+        )
+        if path:
+            self.current_image_path = path
+            self.load_plain_image()
+
+    ##### RUN INFERENCE AND CACHE THE RESULT #####
+
+    def run_inference(self):
+        """
+        Reads the current Fault Injection Type and Choose Resilience Method
+        dropdowns, corrupts a weight on models[0] (same mechanism as ecc.py's
+        inject_weight_fault, just with an exact bit count/stuck from the GUI
+        dropdown), then draws the left (FAULTY RUN) and right (RESILIENT RUN)
+        results accordingly. "None" resilience just mirrors the faulty result
+        on both sides, since nothing is correcting it.
+        """
+        fault_spec = FAULT_TYPE_MAP[self.fault_type_dropdown.currentText()]
+        resilience_choice = self.resilience_dropdown.currentText()
+
+        img_tensor = load_image_tensor(self.current_image_path)
+        img_array = (img_tensor[0].permute(1, 2, 0).cpu().numpy() * 255).astype("uint8")
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+
+        param = idx = orig_val = None
+
+        if fault_spec is not None:
+            param, idx, orig_val, corrupted_val, diff = inject_weight_fault_bits(models[0], fault_spec)
+            param.data.view(-1)[idx] = corrupted_val
+
+        with torch.no_grad():
+            raw0 = models[0](img_tensor)
+        faulty_detections = decode_output_with_boxes(raw0, models[0])
+
+        if resilience_choice == "Weight ECC" and fault_spec is not None:
+            corrected_val, status = apply_secded(orig_val, corrupted_val, diff)
+            param.data.view(-1)[idx] = corrected_val
+            with torch.no_grad():
+                raw_resilient = models[0](img_tensor)
+            resilient_detections = decode_output_with_boxes(raw_resilient, models[0])
+
+        elif resilience_choice == "TMR":
+            with torch.no_grad():
+                raw1 = models[1](img_tensor)
+                raw2 = models[2](img_tensor)
+            boxed_results = [
+                faulty_detections,
+                decode_output_with_boxes(raw1, models[1]),
+                decode_output_with_boxes(raw2, models[2]),
+            ]
+            counts = [len(r) for r in boxed_results]
+            voted_count = max(set(counts), key=counts.count)
+            resilient_detections = next(r for r in boxed_results if len(r) == voted_count)
+
+        elif resilience_choice == "DWC w/ Retry + Vote":
+            with torch.no_grad():
+                raw1 = models[1](img_tensor)
+            r1 = decode_output_with_boxes(raw1, models[1])
+            if len(faulty_detections) == len(r1):
+                resilient_detections = faulty_detections
+            else:
+                with torch.no_grad():
+                    raw2 = models[2](img_tensor)
+                r2 = decode_output_with_boxes(raw2, models[2])
+                boxed_results = [faulty_detections, r1, r2]
+                counts = [len(r) for r in boxed_results]
+                voted_count = max(set(counts), key=counts.count)
+                resilient_detections = next(r for r in boxed_results if len(r) == voted_count)
+
+        else:  # "None", or Weight ECC with no fault selected
+            resilient_detections = faulty_detections
+
+        if param is not None:
+            restore_weight(param, idx, orig_val)
+
+        self.base_pixmap_gold = load_image_with_boxes(img_array, faulty_detections)
+        self.base_pixmap_fault = load_image_with_boxes(img_array, resilient_detections)
+
+        self.gold_count_number.setText(str(len(faulty_detections)))
+        self.gold_count_number.adjustSize()
+        self.fault_count_number.setText(str(len(resilient_detections)))
+        self.fault_count_number.adjustSize()
+
+        self._rescale_to_label()
+        self._reposition_count_text()
 
     def resizeEvent(self, event):
+        self._reposition_everything()
+        super().resizeEvent(event)
+
+    # ####### bundles every reposition call in one place - used on resize AND once at startup
+    def _reposition_everything(self):
         self._rescale_to_label()
         self._reposition_sidebar_bars()
         self._reposition_tags()
         self._reposition_count_text()
         self._reposition_choose_image_box()
-        super().resizeEvent(event)
 
     def _reposition_count_text(self):
         left_margin = 55
@@ -521,10 +634,6 @@ class MainWindow(QMainWindow):
                 Qt.TransformationMode.SmoothTransformation
             )
             self.live_video_fault.setPixmap(scaled_fault)
-    
-    def open_image_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "Choose Image Folder", r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled")
-        print("Selected folder:", folder)
         
 ############### DRAW A TRAPEZOID ###############
 
@@ -605,6 +714,44 @@ def load_image_with_boxes(img_array, nonfaulty_detections, faulty_detections=Non
 
 ############### GET THE DETECTION ###############
 
+def inject_neuron_fault(model, fault_spec):
+    """Same mechanism as faults.inject_fault_direct, but takes an exact bit
+    count (int) or 'stuck' directly, so the GUI's per-bit dropdown options
+    (1 Bit...7 Bits) can be honored exactly instead of only single/multi/stuck."""
+    if fault_spec is None:
+        return None
+    target_layers = [m for m in model.modules() if isinstance(m, torch.nn.Conv2d)]
+    layer_idx = random.randint(0, len(target_layers) - 1)
+    target_layer = target_layers[layer_idx]
+
+    def hook(module, input_val, output):
+        _, C, H, W = output.shape
+        c = random.randint(0, C - 1)
+        h = random.randint(0, H - 1)
+        w = random.randint(0, W - 1)
+        orig_val = output[0, c, h, w].item()
+        if fault_spec == "stuck":
+            output[0, c, h, w] = stuck_bit(orig_val)
+        else:
+            output[0, c, h, w] = flip_bits(orig_val, fault_spec)
+        return output
+
+    return target_layer.register_forward_hook(hook)
+
+def inject_weight_fault_bits(model, fault_spec):
+    """Same idea as ecc.inject_weight_fault, but for an exact bit count or
+    'stuck', since Weight ECC needs weight-level (not neuron-hook) corruption."""
+    target_params = [p for name, p in model.named_parameters() if "weight" in name]
+    param = random.choice(target_params)
+    flat = param.data.view(-1)
+    idx = random.randint(0, flat.numel() - 1)
+    orig_val = flat[idx].item()
+    if fault_spec == "stuck":
+        corrupted_val, diff = stuck_bit_count(orig_val)
+    else:
+        corrupted_val, diff = flip_bits_count(orig_val, fault_spec)
+    return param, idx, orig_val, corrupted_val, diff
+
 def get_real_detection(path, model_index=0):
     img_tensor = load_image_tensor(path)
 
@@ -634,6 +781,38 @@ def get_real_detection(path, model_index=0):
 
     return detections, img_array
 
+def decode_output_with_boxes(raw_output, model):
+    """Same decoding as decode.decode_output, but keeps box coordinates -
+    needed for drawing, since decode_output only returns (class, confidence)."""
+    detect_layer = model.model[-1]
+    preds = raw_output[0] if isinstance(raw_output, tuple) else raw_output
+    preds = preds.transpose(1, 2)
+    out = detect_layer.postprocess(preds)[0]
+    mask = out[:, 4] > 0.25
+    out = out[mask]
+
+    detections = []
+    for row in out:
+        cx, cy, w, h = row[0].item(), row[1].item(), row[2].item(), row[3].item()
+        conf = row[4].item()
+        cls = int(row[5].item())
+        x1 = int(cx - w / 2)
+        y1 = int(cy - h / 2)
+        x2 = int(cx + w / 2)
+        y2 = int(cy + h / 2)
+        detections.append(((x1, y1, x2, y2), cls, conf))
+    return detections
+
+# ####### new - loads+letterboxes an image for display only, no model run, so "Choose Image" doesn't trigger inference
+def get_display_image(path):
+    img_tensor = load_image_tensor(path)
+    img_array = (img_tensor[0].permute(1, 2, 0).cpu().numpy() * 255).astype("uint8")
+    img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+    img_rgb = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+    h, w, ch = img_rgb.shape
+    qimg = QImage(img_rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
+    return QPixmap.fromImage(qimg)
+
 ############### PRETTY COLORS ###############
 
 def get_class_color(cls):
@@ -646,12 +825,5 @@ def get_class_color(cls):
 
 app = QApplication(sys.argv)    # Engine to power GUI
 window = MainWindow()           # Create instance of class window
-window.show()                   # Show da window'
-
-window._rescale_to_label()
-window._reposition_sidebar_bars()
-window._reposition_tags()
-window._reposition_count_text()
-window._reposition_choose_image_box()
-
+window.show()                   # Show da window
 app.exec()                      # Start the loop
