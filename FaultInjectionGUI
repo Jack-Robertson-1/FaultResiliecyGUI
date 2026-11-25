@@ -12,6 +12,9 @@ from PyQt6.QtCore import QPointF
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QComboBox
 from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtWidgets import QFileDialog
+from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QSize
 
 import cv2
 from PyQt6.QtGui import QImage
@@ -53,7 +56,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Fault Tolerance Display")
-        self.resize(1200, 700)
+        self.resize(1300, 614)
 
         # Main widget to build on top off
         central_widget = QWidget()
@@ -127,6 +130,33 @@ class MainWindow(QMainWindow):
         bottom_menu_shadow.setColor(QColor(0, 0, 0, 120))   # dark, mostly opaque
         bottom_menu_shadow.setOffset(0, 6)                   # shifted down - shadow falls below the shape
         bottom_menu.setGraphicsEffect(bottom_menu_shadow)
+        
+        # Choose Image box, sitting in the bottom menu's left side
+        self.choose_image_box = QWidget(bottom_menu)
+        self.choose_image_box.setStyleSheet("""
+            background-color: rgba(0, 0, 0, 90);
+            border: none;
+            border-radius: 10px;
+        """)
+
+        self.choose_image_label = QLabel("Choose Image", self.choose_image_box)
+        self.choose_image_label.setFont(QFont("Gadugi", 11))
+        self.choose_image_label.setStyleSheet("color: white; background: transparent; border: none;")
+        self.choose_image_label.adjustSize()
+        
+
+        self.folder_button = QPushButton(self.choose_image_box)
+        self.folder_button.setIcon(QIcon("file_icon.png"))
+        self.folder_button.setIconSize(QSize(48, 48))
+        self.folder_button.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+            }
+        """)
+        self.folder_button.move(20, 45)
+        self.folder_button.setFixedSize(60, 60)
+        self.folder_button.clicked.connect(self.open_image_folder)
         
         # Make sidebar
         sidebar = QLabel("")
@@ -285,7 +315,7 @@ class MainWindow(QMainWindow):
         
         # "GOLDEN BASELINE" / "FAULTED RUN" labels, sitting just below each video
         self.gold_tag = QLabel("GOLDEN BASELINE")
-        self.gold_tag.setFont(QFont("Gadugi", 17, QFont.Weight.Bold))
+        self.gold_tag.setFont(QFont("Gadugi", 14, QFont.Weight.Bold))
         self.gold_tag.setStyleSheet("""
             background-color: #CB8C27;
             color: white;
@@ -295,7 +325,7 @@ class MainWindow(QMainWindow):
         self.gold_tag.adjustSize()
 
         self.fault_tag = QLabel("FAULTED RUN")
-        self.fault_tag.setFont(QFont("Gadugi", 17, QFont.Weight.Bold))
+        self.fault_tag.setFont(QFont("Gadugi", 14, QFont.Weight.Bold))
         self.fault_tag.setStyleSheet("""
             background-color: #C6563F;
             color: white;
@@ -357,7 +387,7 @@ class MainWindow(QMainWindow):
         main_layout.setRowStretch(0, 8)   # top bar
         main_layout.setRowStretch(1, 1)   # blank gap
         main_layout.setRowStretch(2, 40)  # video - gets most vertical space
-        main_layout.setRowStretch(3, 7)   # blank gap / boxes
+        main_layout.setRowStretch(3, 6)   # blank gap / boxes
         main_layout.setRowStretch(4, 16)  # bottom menu
         
         # Update styles
@@ -398,6 +428,7 @@ class MainWindow(QMainWindow):
         self._reposition_sidebar_bars()
         self._reposition_tags()
         self._reposition_count_text()
+        self._reposition_choose_image_box()
         super().resizeEvent(event)
 
     def _reposition_count_text(self):
@@ -454,6 +485,20 @@ class MainWindow(QMainWindow):
         self.sdc_label.move(24, sdc_y)
         self.sdc_bar.move(24, sdc_y + 25)
         self.sdc_value.move(275, sdc_y + 20)
+        
+    def _reposition_choose_image_box(self):
+        self.choose_image_box.move(30, 15)
+        self.choose_image_box.setFixedSize(150, 100)   # taller than before
+
+        box_width = self.choose_image_box.width()
+
+        choose_image_label_width = self.choose_image_label.width()
+        self.choose_image_label.move((box_width - choose_image_label_width) // 2, 10)
+
+        icon_size = 70
+        self.folder_button.setIconSize(QSize(icon_size, icon_size))
+        self.folder_button.setFixedSize(icon_size, icon_size)
+        self.folder_button.move((box_width - icon_size) // 2, 30)
 
     def _rescale_to_label(self):
 
@@ -476,6 +521,10 @@ class MainWindow(QMainWindow):
                 Qt.TransformationMode.SmoothTransformation
             )
             self.live_video_fault.setPixmap(scaled_fault)
+    
+    def open_image_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Choose Image Folder", r"C:\Users\218ro\rareplanes\test\PS-RGB_tiled")
+        print("Selected folder:", folder)
         
 ############### DRAW A TRAPEZOID ###############
 
@@ -597,5 +646,12 @@ def get_class_color(cls):
 
 app = QApplication(sys.argv)    # Engine to power GUI
 window = MainWindow()           # Create instance of class window
-window.show()                   # Show da window
+window.show()                   # Show da window'
+
+window._rescale_to_label()
+window._reposition_sidebar_bars()
+window._reposition_tags()
+window._reposition_count_text()
+window._reposition_choose_image_box()
+
 app.exec()                      # Start the loop
